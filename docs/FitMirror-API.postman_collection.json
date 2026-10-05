@@ -1,0 +1,672 @@
+{
+  "info": {
+    "_postman_id": "fitmirror-api-collection-v1",
+    "name": "FitMirror API",
+    "description": "Complete API collection for FitMirror — Virtual Fitting Room.\n\nBackend base URL: http://localhost:5001/api\n\n**Authentication:**\n- Public endpoints do not require a token.\n- Protected endpoints require `Authorization: Bearer {{token}}`.\n- After calling Login, the test script automatically saves the JWT to the `token` collection variable.\n\n**Collection Variables:**\n- `baseUrl` — backend API root\n- `token` — JWT for authenticated requests (auto-populated by Login)\n- `garmentId` — auto-populated by Create Garment\n- `savedLookId` — auto-populated by Create Saved Look\n- `notificationId` — auto-populated by Send Notification",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:5001/api", "type": "string", "description": "FitMirror backend API root URL" },
+    { "key": "token", "value": "", "type": "string", "description": "JWT bearer token — auto-populated by the Login request test script" },
+    { "key": "garmentId", "value": "", "type": "string", "description": "MongoDB ObjectId of a garment — auto-populated by Create Garment" },
+    { "key": "savedLookId", "value": "", "type": "string", "description": "MongoDB ObjectId of a saved look — auto-populated by Create Saved Look" },
+    { "key": "notificationId", "value": "", "type": "string", "description": "MongoDB ObjectId of a notification — auto-populated by Send Notification" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "01 Authentication",
+      "description": "Register, login, Firebase token exchange, and current-user profile. All under /api/auth.",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/register", "host": ["{{baseUrl}}"], "path": ["auth", "register"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ayush Sharma\",\n  \"email\": \"ayush@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "POST /api/auth/register\n\nRegisters a new user account. All public registrations are forced to role='user' regardless of any role field sent.\n\nRequired body fields:\n- name (string) — non-empty\n- email (string) — valid email\n- password (string) — minimum 6 characters\n\nSuccess: 201 Created\nErrors: 400 validation / 400 email already exists"
+          },
+          "response": [
+            {
+              "name": "201 Registration Successful",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 201,\n  \"message\": \"Registration successful\",\n  \"data\": {\n    \"user\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Ayush Sharma\",\n      \"email\": \"ayush@example.com\",\n      \"role\": \"user\",\n      \"photoUrl\": null,\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    },\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.token) {",
+                  "    pm.collectionVariables.set('token', json.data.token);",
+                  "    console.log('Token saved:', json.data.token.substring(0,20) + '...');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/login", "host": ["{{baseUrl}}"], "path": ["auth", "login"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"ayush@example.com\",\n  \"password\": \"password123\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "POST /api/auth/login\n\nAuthenticates an existing user or retailer. Returns a JWT token.\nTest script auto-saves {{token}} collection variable.\n\nRequired body fields:\n- email (string)\n- password (string)\n\nSuccess: 200 OK\nErrors: 400 validation / 401 invalid credentials"
+          },
+          "response": [
+            {
+              "name": "200 Login Successful",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"user\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Ayush Sharma\",\n      \"email\": \"ayush@example.com\",\n      \"role\": \"user\",\n      \"photoUrl\": null,\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    },\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Firebase Authentication",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.token) {",
+                  "    pm.collectionVariables.set('token', json.data.token);",
+                  "    console.log('Firebase token saved.');",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/auth/firebase", "host": ["{{baseUrl}}"], "path": ["auth", "firebase"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idToken\": \"<firebase-id-token-from-client-sdk>\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "POST /api/auth/firebase\n\nExchanges a Firebase Authentication ID token (obtained from the Firebase client SDK after Email/Password sign-in) for a FitMirror JWT.\n\nIf the email from the decoded Firebase token does not exist in MongoDB, a new user account is auto-created with role='user'.\n\nRequired body fields:\n- idToken (string) — Firebase ID token\n\nSuccess: 200 OK\nErrors: 400 missing idToken / 400 no email on Firebase account / 401 invalid token / 503 Firebase not configured"
+          },
+          "response": [
+            {
+              "name": "200 Firebase Auth Successful",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Firebase authentication successful\",\n  \"data\": {\n    \"user\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Ayush Sharma\",\n      \"email\": \"ayush@example.com\",\n      \"role\": \"user\",\n      \"photoUrl\": null,\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    },\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Current User",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/auth/me", "host": ["{{baseUrl}}"], "path": ["auth", "me"] },
+            "description": "GET /api/auth/me\n\nReturns the full profile of the currently authenticated user.\n\nAuthentication: Bearer Token required ({{token}})\n\nSuccess: 200 OK\nErrors: 401 no/invalid token"
+          },
+          "response": [
+            {
+              "name": "200 User Profile",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"User profile fetched\",\n  \"data\": {\n    \"user\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Ayush Sharma\",\n      \"email\": \"ayush@example.com\",\n      \"role\": \"user\",\n      \"photoUrl\": \"/uploads/users/photo.jpg\",\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Garments",
+      "description": "Garment catalog. GET endpoints are public. POST/PUT/DELETE require Bearer auth + retailer role. Image uploads use multipart/form-data field 'image'. All under /api/garments.",
+      "item": [
+        {
+          "name": "Get All Garments",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/garments?page=1&limit=12",
+              "host": ["{{baseUrl}}"],
+              "path": ["garments"],
+              "query": [
+                { "key": "category", "value": "T-Shirt", "description": "Filter by category (case-insensitive exact match). E.g. Shirt, T-Shirt, Pants, Jacket, Dress, Suit, Other", "disabled": true },
+                { "key": "size", "value": "M", "description": "Filter by size; matches garment.size OR garment.availableSizes array. Case-insensitive.", "disabled": true },
+                { "key": "search", "value": "blue", "description": "Regex search across title, description, and category fields.", "disabled": true },
+                { "key": "retailer", "value": "64f1a2b3c4d5e6f7a8b9c0d1", "description": "Filter garments by retailer MongoDB ObjectId.", "disabled": true },
+                { "key": "page", "value": "1", "description": "Page number (default: 1)" },
+                { "key": "limit", "value": "12", "description": "Results per page (default: 12)" }
+              ]
+            },
+            "description": "GET /api/garments\n\nReturns a paginated list of all garments. Multiple filters can be combined (AND logic).\n\nAuthentication: Not required (public)\n\nQuery parameters (all optional):\n- category — case-insensitive exact match\n- size — matches size field OR availableSizes array\n- search — regex search across title, description, category\n- retailer — filter by retailer ObjectId\n- page — default 1\n- limit — default 12\n\nSuccess: 200 OK"
+          },
+          "response": [
+            {
+              "name": "200 Garments List",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Garments retrieved successfully\",\n  \"data\": {\n    \"garments\": [\n      {\n        \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d2\",\n        \"title\": \"Classic Blue Jeans\",\n        \"description\": \"Slim-fit blue denim jeans\",\n        \"category\": \"Pants\",\n        \"price\": 1299,\n        \"size\": \"M\",\n        \"availableSizes\": [\"S\", \"M\", \"L\", \"XL\"],\n        \"imageUrl\": \"/uploads/garments/jeans-blue.png\",\n        \"purchaseUrl\": \"https://example.com/buy\",\n        \"retailer\": { \"_id\": \"64f1...\", \"name\": \"Nike Store\", \"email\": \"nike@example.com\" },\n        \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n      }\n    ],\n    \"pagination\": { \"total\": 1, \"page\": 1, \"pages\": 1, \"limit\": 12 }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Garment By ID",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/garments/{{garmentId}}", "host": ["{{baseUrl}}"], "path": ["garments", "{{garmentId}}"] },
+            "description": "GET /api/garments/:id\n\nReturns a single garment by MongoDB ObjectId. Retailer is populated with name and email.\n\nAuthentication: Not required (public)\n\nPath parameters:\n- id — MongoDB ObjectId of the garment\n\nSuccess: 200 OK\nErrors: 404 not found / 404 invalid ObjectId"
+          },
+          "response": [
+            {
+              "name": "200 Garment Detail",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Garment details fetched\",\n  \"data\": {\n    \"garment\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d2\",\n      \"title\": \"Classic Blue Jeans\",\n      \"description\": \"Slim-fit blue denim jeans\",\n      \"category\": \"Pants\",\n      \"price\": 1299,\n      \"size\": \"M\",\n      \"availableSizes\": [\"S\", \"M\", \"L\", \"XL\"],\n      \"imageUrl\": \"/uploads/garments/jeans-blue.png\",\n      \"purchaseUrl\": \"https://example.com/buy\",\n      \"retailer\": { \"_id\": \"64f1...\", \"name\": \"Nike Store\", \"email\": \"nike@example.com\" },\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Garment",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.garment) {",
+                  "    pm.collectionVariables.set('garmentId', json.data.garment._id);",
+                  "    console.log('garmentId saved:', json.data.garment._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/garments", "host": ["{{baseUrl}}"], "path": ["garments"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Classic White T-Shirt", "description": "REQUIRED. Garment display name, non-empty.", "type": "text" },
+                { "key": "category", "value": "T-Shirt", "description": "REQUIRED. E.g. Shirt, T-Shirt, Pants, Jacket, Dress, Suit, Other", "type": "text" },
+                { "key": "price", "value": "799", "description": "REQUIRED. Numeric value >= 0", "type": "text" },
+                { "key": "description", "value": "A comfortable everyday white t-shirt", "description": "Optional.", "type": "text" },
+                { "key": "size", "value": "M", "description": "Optional. Default size label. Defaults to M if omitted.", "type": "text" },
+                { "key": "availableSizes", "value": "S,M,L,XL", "description": "Optional. Comma-separated sizes. Defaults to S,M,L,XL.", "type": "text" },
+                { "key": "purchaseUrl", "value": "https://example.com/buy/white-tshirt", "description": "Optional. External purchase link.", "type": "text" },
+                { "key": "image", "value": "", "description": "REQUIRED. Garment image file (PNG/JPG). Stored in backend/uploads/garments/.", "type": "file" }
+              ]
+            },
+            "description": "POST /api/garments\n\nCreates a new garment. Retailer role required.\n\nAuthentication: Bearer Token (retailer account only)\n\nBody: multipart/form-data\n\nRequired fields:\n- title (text) — non-empty\n- category (text) — non-empty\n- price (text/number) — numeric >= 0\n- image (file) — garment photo, stored via Multer in backend/uploads/garments/\n\nOptional fields:\n- description (text)\n- size (text) — default size label, defaults to M\n- availableSizes (text) — comma-separated e.g. S,M,L,XL\n- purchaseUrl (text) — buy link\n\nSuccess: 201 Created\nErrors: 400 validation / 400 no image / 401 not authenticated / 403 not retailer"
+          },
+          "response": [
+            {
+              "name": "201 Garment Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 201,\n  \"message\": \"Garment created successfully\",\n  \"data\": {\n    \"garment\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d2\",\n      \"title\": \"Classic White T-Shirt\",\n      \"description\": \"A comfortable everyday white t-shirt\",\n      \"category\": \"T-Shirt\",\n      \"price\": 799,\n      \"size\": \"M\",\n      \"availableSizes\": [\"S\", \"M\", \"L\", \"XL\"],\n      \"imageUrl\": \"/uploads/garments/1234567890-tshirt.png\",\n      \"purchaseUrl\": \"https://example.com/buy/white-tshirt\",\n      \"retailer\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Garment",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/garments/{{garmentId}}", "host": ["{{baseUrl}}"], "path": ["garments", "{{garmentId}}"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "title", "value": "Updated T-Shirt Name", "description": "Optional. New title; cannot be empty string if provided.", "type": "text", "disabled": true },
+                { "key": "category", "value": "Shirt", "description": "Optional. New category; cannot be empty string if provided.", "type": "text", "disabled": true },
+                { "key": "price", "value": "999", "description": "Optional. New price (numeric >= 0).", "type": "text", "disabled": true },
+                { "key": "description", "value": "Updated description", "description": "Optional.", "type": "text", "disabled": true },
+                { "key": "size", "value": "L", "description": "Optional. New default size label.", "type": "text", "disabled": true },
+                { "key": "availableSizes", "value": "M,L,XL,XXL", "description": "Optional. New comma-separated available sizes.", "type": "text", "disabled": true },
+                { "key": "purchaseUrl", "value": "https://example.com/buy/updated", "description": "Optional. New purchase URL.", "type": "text", "disabled": true },
+                { "key": "image", "value": "", "description": "Optional. New garment image file to replace the existing one. Old file is deleted from disk.", "type": "file", "disabled": true }
+              ]
+            },
+            "description": "PUT /api/garments/:id\n\nUpdates an existing garment. Retailer role required. Only the owning retailer can update.\n\nAuthentication: Bearer Token (owning retailer)\n\nPath parameters:\n- id — MongoDB ObjectId of the garment\n\nBody: multipart/form-data — all fields optional\n\nUpdatable fields:\n- title (text) — cannot be empty if provided\n- category (text) — cannot be empty if provided\n- price (text/number) — numeric >= 0 if provided\n- description (text)\n- size (text)\n- availableSizes (text) — comma-separated\n- purchaseUrl (text)\n- image (file) — replaces existing image; old file deleted from disk\n\nSuccess: 200 OK\nErrors: 400 validation / 401 not authenticated / 403 not retailer or not owner / 404 not found"
+          },
+          "response": [
+            {
+              "name": "200 Garment Updated",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Garment updated successfully\",\n  \"data\": {\n    \"garment\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d2\",\n      \"title\": \"Updated T-Shirt Name\",\n      \"category\": \"T-Shirt\",\n      \"price\": 999,\n      \"size\": \"L\",\n      \"availableSizes\": [\"M\", \"L\", \"XL\", \"XXL\"],\n      \"imageUrl\": \"/uploads/garments/new-image.png\",\n      \"purchaseUrl\": \"https://example.com/buy/updated\",\n      \"retailer\": \"64f1a2b3c4d5e6f7a8b9c0d1\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Garment",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/garments/{{garmentId}}", "host": ["{{baseUrl}}"], "path": ["garments", "{{garmentId}}"] },
+            "description": "DELETE /api/garments/:id\n\nPermanently deletes a garment and removes its image file from disk. Only the owning retailer can delete.\n\nAuthentication: Bearer Token (owning retailer)\n\nPath parameters:\n- id — MongoDB ObjectId of the garment\n\nSuccess: 200 OK (data: null)\nErrors: 401 not authenticated / 403 not retailer or not owner / 404 not found"
+          },
+          "response": [
+            {
+              "name": "200 Garment Deleted",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Garment deleted successfully\",\n  \"data\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Measurements",
+      "description": "Body measurement endpoints. All routes require authentication. All under /api/measurements.",
+      "item": [
+        {
+          "name": "Get Measurements",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/measurements", "host": ["{{baseUrl}}"], "path": ["measurements"] },
+            "description": "GET /api/measurements\n\nReturns the body measurements for the authenticated user, plus the computed sizeRecommendation.\n\nAuthentication: Bearer Token required\n\nSuccess: 200 OK\n- Returns measurements: null and sizeRecommendation: null if none saved yet.\n\nErrors: 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "200 Measurements Retrieved",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Measurements retrieved successfully\",\n  \"data\": {\n    \"measurements\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d3\",\n      \"user\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"height\": 175,\n      \"weight\": 70,\n      \"chest\": 92,\n      \"waist\": 78,\n      \"hips\": 96,\n      \"shoulder\": 44,\n      \"preferredFit\": \"regular\"\n    },\n    \"sizeRecommendation\": {\n      \"recommendedSize\": \"M\",\n      \"fitAdvice\": \"Regular fit suits your measurements\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Measurements",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/measurements", "host": ["{{baseUrl}}"], "path": ["measurements"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"height\": 175,\n  \"weight\": 70,\n  \"chest\": 92,\n  \"waist\": 78,\n  \"hips\": 96,\n  \"shoulder\": 44,\n  \"preferredFit\": \"regular\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "PUT /api/measurements\n\nCreates or updates (upsert) body measurements. Returns saved measurements and computed size recommendation.\n\nAuthentication: Bearer Token required\n\nRequired body fields:\n- height (number) — cm\n- weight (number) — kg\n- chest (number) — cm\n- waist (number) — cm\n- hips (number) — cm\n\nOptional body fields:\n- shoulder (number) — cm, defaults to 44\n- preferredFit (string) — 'tight', 'regular', or 'oversized', defaults to 'regular'\n\nSuccess: 200 OK\nErrors: 400 validation (non-numeric values or invalid preferredFit) / 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "200 Measurements Saved",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Measurements saved successfully\",\n  \"data\": {\n    \"measurements\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d3\",\n      \"user\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"height\": 175,\n      \"weight\": 70,\n      \"chest\": 92,\n      \"waist\": 78,\n      \"hips\": 96,\n      \"shoulder\": 44,\n      \"preferredFit\": \"regular\"\n    },\n    \"sizeRecommendation\": {\n      \"recommendedSize\": \"M\",\n      \"fitAdvice\": \"Regular fit suits your measurements\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Recommendations",
+      "description": "Rule-based garment recommendation endpoints. NOT AI/ML — recommendations are computed from stored body measurements. All routes require authentication. All under /api/recommendations.",
+      "item": [
+        {
+          "name": "Get Recommendations",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/recommendations",
+              "host": ["{{baseUrl}}"],
+              "path": ["recommendations"],
+              "query": [
+                { "key": "category", "value": "T-Shirt", "description": "Optional. Filter recommended garments by category.", "disabled": true }
+              ]
+            },
+            "description": "GET /api/recommendations\n\nReturns garments recommended for the logged-in user based on their saved body measurements using a rule-based size matching algorithm.\n\nAuthentication: Bearer Token required\n\nQuery parameters (optional):\n- category — filter to a specific garment category\n\nSuccess: 200 OK\n- Returns recommendedSize, fitAdvice, and a garments array.\n- Returns empty garments if no measurements saved.\n\nErrors: 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "200 Recommendations",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Recommended garments retrieved successfully\",\n  \"data\": {\n    \"recommendedSize\": \"M\",\n    \"fitAdvice\": \"Regular fit suits your measurements\",\n    \"garments\": [\n      {\n        \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d2\",\n        \"title\": \"Classic Blue Jeans\",\n        \"category\": \"Pants\",\n        \"price\": 1299,\n        \"size\": \"M\",\n        \"availableSizes\": [\"S\", \"M\", \"L\"],\n        \"imageUrl\": \"/uploads/garments/jeans-blue.png\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Size Recommendation",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/recommendations/size", "host": ["{{baseUrl}}"], "path": ["recommendations", "size"] },
+            "description": "GET /api/recommendations/size\n\nReturns only the computed size recommendation (S/M/L/XL) and fit advice string derived from the user's stored measurements.\n\nAuthentication: Bearer Token required\n\nSuccess: 200 OK\nErrors: 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "200 Size Recommendation",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Size recommendation computed\",\n  \"data\": {\n    \"recommendation\": {\n      \"recommendedSize\": \"M\",\n      \"fitAdvice\": \"Regular fit suits your measurements\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Saved Looks",
+      "description": "Saved outfit/look endpoints.\n- GET /:id is semi-public (public looks viewable without auth).\n- All other routes require authentication.\nAll under /api/saved-looks.",
+      "item": [
+        {
+          "name": "Create Saved Look",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.savedLook) {",
+                  "    pm.collectionVariables.set('savedLookId', json.data.savedLook._id);",
+                  "    console.log('savedLookId saved:', json.data.savedLook._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/saved-looks", "host": ["{{baseUrl}}"], "path": ["saved-looks"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"My Summer Look\",\n  \"garments\": [\"{{garmentId}}\"],\n  \"isPublic\": true,\n  \"previewUrl\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "POST /api/saved-looks\n\nSaves a new outfit look. Automatically generates a unique shareToken for public sharing.\n\nAuthentication: Bearer Token required\n\nRequired body fields:\n- name (string) — look name, non-empty\n- garments (array of strings) — array of garment ObjectIds (min 1)\n\nOptional body fields:\n- isPublic (boolean) — defaults to true\n- previewUrl (string) — canvas preview image URL or data URI\n\nSuccess: 201 Created\nErrors: 400 validation / 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "201 Saved Look Created",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 201,\n  \"message\": \"Look saved successfully\",\n  \"data\": {\n    \"savedLook\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d4\",\n      \"user\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"My Summer Look\",\n      \"garments\": [{\"_id\": \"64f1a2b3c4d5e6f7a8b9c0d2\", \"title\": \"Classic Blue Jeans\"}],\n      \"isPublic\": true,\n      \"previewUrl\": \"\",\n      \"shareToken\": \"x4k9m2zy1lp3\",\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get My Saved Looks",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/saved-looks", "host": ["{{baseUrl}}"], "path": ["saved-looks"] },
+            "description": "GET /api/saved-looks\n\nReturns all saved looks for the authenticated user, sorted by newest first. Garment references are populated.\n\nAuthentication: Bearer Token required\n\nSuccess: 200 OK\nErrors: 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "200 Saved Looks List",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Saved looks retrieved successfully\",\n  \"data\": {\n    \"savedLooks\": [\n      {\n        \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d4\",\n        \"name\": \"My Summer Look\",\n        \"garments\": [{\"_id\": \"...\", \"title\": \"Classic Blue Jeans\"}],\n        \"isPublic\": true,\n        \"shareToken\": \"x4k9m2zy1lp3\",\n        \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Saved Look By ID / Share Token",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/saved-looks/{{savedLookId}}", "host": ["{{baseUrl}}"], "path": ["saved-looks", "{{savedLookId}}"] },
+            "description": "GET /api/saved-looks/:id\n\nReturns a single saved look. The :id path parameter can be either a MongoDB ObjectId (24-hex) OR a shareToken string.\n\nAuthentication: Optional\n- Public looks (isPublic: true) viewable without token.\n- Private looks (isPublic: false) require the owning user's Bearer token.\n\nPath parameters:\n- id — MongoDB ObjectId OR shareToken string\n\nSuccess: 200 OK\nErrors: 403 look is private / 404 not found"
+          },
+          "response": [
+            {
+              "name": "200 Saved Look Fetched",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Saved look fetched successfully\",\n  \"data\": {\n    \"savedLook\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d4\",\n      \"user\": { \"_id\": \"64f1...\", \"name\": \"Ayush Sharma\", \"email\": \"ayush@example.com\" },\n      \"name\": \"My Summer Look\",\n      \"garments\": [{\"_id\": \"...\", \"title\": \"Classic Blue Jeans\"}],\n      \"isPublic\": true,\n      \"shareToken\": \"x4k9m2zy1lp3\",\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Saved Look",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "DELETE",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/saved-looks/{{savedLookId}}", "host": ["{{baseUrl}}"], "path": ["saved-looks", "{{savedLookId}}"] },
+            "description": "DELETE /api/saved-looks/:id\n\nPermanently deletes a saved look. Only the owning user can delete.\n\nAuthentication: Bearer Token required\n\nPath parameters:\n- id — MongoDB ObjectId of the saved look\n\nSuccess: 200 OK (data: null)\nErrors: 401 not authenticated / 403 not the owner / 404 not found"
+          },
+          "response": [
+            {
+              "name": "200 Saved Look Deleted",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Saved look deleted successfully\",\n  \"data\": null\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Analytics",
+      "description": "Analytics event tracking and retailer conversion metrics.\n- POST /track — semi-public (auth optional)\n- GET /conversions — retailer only\nAll under /api/analytics.",
+      "item": [
+        {
+          "name": "Track Event",
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/analytics/track", "host": ["{{baseUrl}}"], "path": ["analytics", "track"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"garmentId\": \"{{garmentId}}\",\n  \"eventType\": \"try_on\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "POST /api/analytics/track\n\nTracks a try-on or purchase-click event for a garment.\n\nAuthentication: Optional\n- If Authorization header is present, the request is authenticated and user is attached to the event.\n- If unauthenticated, user is stored as null.\n\nRequired body fields:\n- garmentId (string) — MongoDB ObjectId of the garment\n- eventType (string) — must be exactly 'try_on' or 'purchase_click'\n\nSuccess: 201 Created\nErrors: 400 missing/invalid fields / 404 garment not found"
+          },
+          "response": [
+            {
+              "name": "201 Event Tracked",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 201,\n  \"message\": \"Analytics event tracked\",\n  \"data\": {\n    \"event\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d5\",\n      \"garment\": \"64f1a2b3c4d5e6f7a8b9c0d2\",\n      \"user\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"retailer\": \"64f1a2b3c4d5e6f7a8b9c0d0\",\n      \"eventType\": \"try_on\",\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Conversion Analytics",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/analytics/conversions", "host": ["{{baseUrl}}"], "path": ["analytics", "conversions"] },
+            "description": "GET /api/analytics/conversions\n\nReturns conversion analytics (try-on counts, purchase clicks, conversion rates) for all garments belonging to the authenticated retailer.\n\nAuthentication: Bearer Token required — retailer role only\n\nSuccess: 200 OK\nErrors: 401 not authenticated / 403 not a retailer"
+          },
+          "response": [
+            {
+              "name": "200 Conversion Analytics",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Conversion analytics fetched successfully\",\n  \"data\": {\n    \"overall\": {\n      \"totalTryOns\": 45,\n      \"totalPurchaseClicks\": 12,\n      \"overallConversionRate\": \"26.67%\",\n      \"overallPercentage\": 26.67\n    },\n    \"garments\": [\n      {\n        \"garmentId\": \"64f1a2b3c4d5e6f7a8b9c0d2\",\n        \"title\": \"Classic Blue Jeans\",\n        \"imageUrl\": \"/uploads/garments/jeans-blue.png\",\n        \"category\": \"Pants\",\n        \"price\": 1299,\n        \"tryOns\": 20,\n        \"purchaseClicks\": 5,\n        \"conversionRate\": \"25.00%\",\n        \"conversionPercentage\": 25\n      }\n    ]\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Notifications",
+      "description": "In-app notifications with Socket.io real-time delivery.\n- POST /send — retailer only\n- GET / — any authenticated user\n- PUT /:id/read — any authenticated user\nAll under /api/notifications.",
+      "item": [
+        {
+          "name": "Get Notifications",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "GET",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications", "host": ["{{baseUrl}}"], "path": ["notifications"] },
+            "description": "GET /api/notifications\n\nReturns the latest 30 notifications for the authenticated user, sorted by newest first.\n\nAuthentication: Bearer Token required\n\nSuccess: 200 OK\nErrors: 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "200 Notifications",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Notifications retrieved\",\n  \"data\": {\n    \"notifications\": [\n      {\n        \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d6\",\n        \"recipient\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n        \"title\": \"New Arrivals!\",\n        \"message\": \"Check out our new summer collection.\",\n        \"read\": false,\n        \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n      }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Mark Notification As Read",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "PUT",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/notifications/{{notificationId}}/read", "host": ["{{baseUrl}}"], "path": ["notifications", "{{notificationId}}", "read"] },
+            "description": "PUT /api/notifications/:id/read\n\nMarks a specific notification as read (read: true). Notification must belong to the authenticated user.\n\nAuthentication: Bearer Token required\n\nPath parameters:\n- id — MongoDB ObjectId of the notification\n\nSuccess: 200 OK — returns updated notification document\nErrors: 401 not authenticated / 404 notification not found or not owned by this user"
+          },
+          "response": [
+            {
+              "name": "200 Marked As Read",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"Notification marked as read\",\n  \"data\": {\n    \"notification\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d6\",\n      \"recipient\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"title\": \"New Arrivals!\",\n      \"message\": \"Check out our new summer collection.\",\n      \"read\": true,\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Send Notification",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const json = pm.response.json();",
+                  "if (json.success && json.data && json.data.notification) {",
+                  "    pm.collectionVariables.set('notificationId', json.data.notification._id);",
+                  "    console.log('notificationId saved:', json.data.notification._id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{baseUrl}}/notifications/send", "host": ["{{baseUrl}}"], "path": ["notifications", "send"] },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientId\": \"<target-user-mongodb-id>\",\n  \"title\": \"Summer Sale!\",\n  \"message\": \"Get 30% off on all our summer garments today.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "description": "POST /api/notifications/send\n\nSends a notification to a target user. Stored in MongoDB AND emitted real-time via Socket.io.\n\nAuthentication: Bearer Token required — retailer role only\n\nRequired body fields:\n- recipientId (string) — MongoDB ObjectId of the target user\n- title (string) — notification title, non-empty\n- message (string) — notification body text, non-empty\n\nSuccess: 201 Created\nErrors: 400 missing fields / 401 not authenticated / 403 not a retailer"
+          },
+          "response": [
+            {
+              "name": "201 Notification Sent",
+              "status": "Created",
+              "code": 201,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 201,\n  \"message\": \"Notification sent successfully\",\n  \"data\": {\n    \"notification\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d6\",\n      \"recipient\": \"<target-user-id>\",\n      \"title\": \"Summer Sale!\",\n      \"message\": \"Get 30% off on all our summer garments today.\",\n      \"read\": false,\n      \"createdAt\": \"2024-01-01T00:00:00.000Z\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 User",
+      "description": "User-specific endpoints. All under /api/user.",
+      "item": [
+        {
+          "name": "Upload Full Body Photo",
+          "request": {
+            "auth": { "type": "bearer", "bearer": [{ "key": "token", "value": "{{token}}", "type": "string" }] },
+            "method": "POST",
+            "header": [],
+            "url": { "raw": "{{baseUrl}}/user/upload", "host": ["{{baseUrl}}"], "path": ["user", "upload"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "photo",
+                  "value": "",
+                  "description": "REQUIRED. Full-body photo file (JPG/PNG). Uploaded via Multer and stored in backend/uploads/. Updates user.photoUrl in MongoDB.",
+                  "type": "file"
+                }
+              ]
+            },
+            "description": "POST /api/user/upload\n\nUploads a full-body photo for the authenticated user. The file is stored locally via Multer in backend/uploads/ and the user's photoUrl field in MongoDB is updated.\n\nAuthentication: Bearer Token required\n\nBody: multipart/form-data\n\nRequired fields:\n- photo (file) — image file (JPG or PNG)\n\nSuccess: 200 OK — returns new photoUrl and updated user document\nErrors: 400 no file uploaded / 401 not authenticated"
+          },
+          "response": [
+            {
+              "name": "200 Photo Uploaded",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n  \"success\": true,\n  \"statusCode\": 200,\n  \"message\": \"User full-body photo uploaded successfully\",\n  \"data\": {\n    \"photoUrl\": \"/uploads/users/1234567890-photo.jpg\",\n    \"user\": {\n      \"_id\": \"64f1a2b3c4d5e6f7a8b9c0d1\",\n      \"name\": \"Ayush Sharma\",\n      \"email\": \"ayush@example.com\",\n      \"role\": \"user\",\n      \"photoUrl\": \"/uploads/users/1234567890-photo.jpg\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
